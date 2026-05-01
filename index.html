@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuickVid — Download Anything</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #06060e;
+    --surface: #0d0d1a;
+    --surface2: #12122a;
+    --border: rgba(255,255,255,0.07);
+    --border-glow: rgba(96,165,250,0.3);
+    --blue: #60a5fa;
+    --cyan: #22d3ee;
+    --purple: #a78bfa;
+    --pink: #f472b6;
+    --green: #34d399;
+    --yellow: #fbbf24;
+    --red: #f87171;
+    --text: #f1f5f9;
+    --muted: #64748b;
+    --muted2: #94a3b8;
+  }
+
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  #canvas-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+
+  .grid-overlay {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(96,165,250,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96,165,250,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 2; }
+
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 22px 0; border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800;
+    letter-spacing: -0.5px; text-decoration: none; color: var(--text);
+  }
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--blue), var(--purple));
+    border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+  .logo span { color: var(--blue); }
+
+  nav ul { display: flex; gap: 32px; list-style: none; }
+  nav ul a { color: var(--muted2); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
+  nav ul a:hover { color: var(--blue); }
+
+  .status-dot {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--muted);
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 5px 12px; border-radius: 100px;
+  }
+  .status-dot .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .status-dot.online .dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .status-dot.online { color: var(--green); border-color: rgba(52,211,153,0.2); }
+
+  .hero { padding: 80px 0 60px; text-align: center; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(34,211,238,0.08); border: 1px solid rgba(34,211,238,0.2);
+    color: var(--cyan); padding: 5px 14px; border-radius: 100px;
+    font-size: 12px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 28px;
+  }
+  .badge::before {
+    content: ''; width: 6px; height: 6px; background: var(--cyan);
+    border-radius: 50%; animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+  .hero h1 {
+    font-family: 'Syne', sans-serif; font-size: clamp(42px, 7vw, 80px);
+    font-weight: 800; line-height: 1.05; letter-spacing: -2px; margin-bottom: 20px;
+  }
+  .hero h1 .line1 { display: block; }
+  .hero h1 .line2 {
+    display: block;
+    background: linear-gradient(90deg, var(--blue), var(--cyan), var(--purple));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+
+  .hero p { font-size: 18px; color: var(--muted2); max-width: 520px; margin: 0 auto 48px; font-weight: 300; }
+
+  .platform-pills { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-bottom: 40px; }
+
+  .pill {
+    display: flex; align-items: center; gap: 7px;
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 7px 16px; border-radius: 100px; font-size: 13px; font-weight: 500;
+    cursor: default; color: var(--muted2);
+  }
+  .pill-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  .input-card {
+    background: linear-gradient(145deg, rgba(13,13,26,0.9), rgba(18,18,42,0.9));
+    border: 1px solid var(--border); border-radius: 20px; padding: 32px; margin-bottom: 16px;
+    backdrop-filter: blur(20px); position: relative; overflow: hidden;
+  }
+  .input-card::before {
+    content: ''; position: absolute; top: -1px; left: 10%; right: 10%; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--blue), var(--cyan), transparent); opacity: 0.5;
+  }
+
+  .url-row { display: flex; gap: 12px; margin-bottom: 24px; }
+
+  .url-input-wrap { flex: 1; position: relative; }
+  .url-input-wrap .icon {
+    position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); font-size: 16px; pointer-events: none;
+  }
+
+  #url-input {
+    width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px; padding: 16px 16px 16px 44px; color: var(--text);
+    font-family: 'JetBrains Mono', monospace; font-size: 14px; outline: none;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  #url-input::placeholder { color: var(--muted); }
+  #url-input:focus { border-color: rgba(96,165,250,0.4); background: rgba(96,165,250,0.05); }
+
+  .btn-fetch {
+    display: flex; align-items: center; gap: 8px;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    border: none; border-radius: 12px; padding: 16px 24px;
+    color: white; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; white-space: nowrap;
+    box-shadow: 0 0 30px rgba(59,130,246,0.3);
+  }
+  .btn-fetch:hover { transform: translateY(-1px); box-shadow: 0 0 40px rgba(59,130,246,0.5); background: linear-gradient(135deg, #60a5fa, #3b82f6); }
+  .btn-fetch:active { transform: scale(0.98); }
+  .btn-fetch:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+  .spinner {
+    width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white; border-radius: 50%; animation: spin 0.6s linear infinite; display: none;
+  }
+  .spinner.show { display: block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .format-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .format-label { font-size: 13px; color: var(--muted); font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; }
+  .format-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .fmt-btn {
+    background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px 14px; color: var(--muted2); font-size: 13px; font-weight: 500;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .fmt-btn:hover { border-color: rgba(96,165,250,0.3); color: var(--blue); }
+  .fmt-btn.active { background: rgba(96,165,250,0.12); border-color: rgba(96,165,250,0.4); color: var(--blue); }
+
+  /* Error banner */
+  .error-banner {
+    display: none; background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.25);
+    border-radius: 12px; padding: 14px 18px; margin-bottom: 16px;
+    color: var(--red); font-size: 14px; align-items: center; gap: 10px;
+  }
+  .error-banner.show { display: flex; }
+
+  /* Result card */
+  .result-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    overflow: hidden; display: none; animation: slideUp 0.3s ease;
+  }
+  @keyframes slideUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+  .result-card.show { display: block; }
+
+  .result-inner { display: flex; gap: 0; }
+
+  .thumb-wrap { width: 200px; flex-shrink: 0; background: #000; position: relative; overflow: hidden; min-height: 130px; }
+  .thumb-wrap img { width: 100%; height: 100%; object-fit: cover; opacity: 0.85; }
+  .thumb-badge {
+    position: absolute; bottom: 8px; right: 8px;
+    background: rgba(0,0,0,0.85); color: white; font-size: 11px; font-weight: 600;
+    padding: 2px 7px; border-radius: 4px; font-family: 'JetBrains Mono', monospace;
+  }
+
+  .result-info { flex: 1; padding: 20px 24px; min-width: 0; }
+
+  .result-platform {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 6px;
+    margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.8px;
+  }
+
+  .result-title {
+    font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700;
+    line-height: 1.3; margin-bottom: 8px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .result-meta {
+    font-size: 13px; color: var(--muted); margin-bottom: 16px;
+    display: flex; gap: 16px; flex-wrap: wrap;
+  }
+
+  /* Format selector inside result */
+  .formats-label { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 10px; }
+
+  .format-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+
+  .fmt-option {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 10px;
+    padding: 9px 14px; cursor: pointer; transition: all 0.2s;
+  }
+  .fmt-option:hover { border-color: rgba(96,165,250,0.35); background: rgba(96,165,250,0.06); }
+  .fmt-option.selected { border-color: rgba(96,165,250,0.5); background: rgba(96,165,250,0.1); }
+
+  .fmt-option-label { font-size: 13px; font-weight: 500; color: var(--text); }
+  .fmt-option-size { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .fmt-option-icon { font-size: 14px; }
+
+  .btn-download {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    border: none; border-radius: 10px; padding: 12px 22px;
+    color: white; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; text-decoration: none;
+    box-shadow: 0 0 20px rgba(34,197,94,0.2);
+  }
+  .btn-download:hover { transform: translateY(-1px); box-shadow: 0 0 30px rgba(34,197,94,0.35); }
+  .btn-download:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* Progress */
+  .progress-wrap { margin-top: 12px; display: none; }
+  .progress-wrap.show { display: block; }
+  .progress-top { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted2); margin-bottom: 8px; }
+  .progress-bar-bg { height: 4px; background: rgba(255,255,255,0.06); border-radius: 100px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--green), var(--cyan)); border-radius: 100px; transition: width 0.3s ease; }
+
+  /* Stats */
+  .stats-row { display: flex; gap: 0; border: 1px solid var(--border); border-radius: 16px; overflow: hidden; margin: 60px 0; }
+  .stat-item { flex: 1; text-align: center; padding: 32px 20px; border-right: 1px solid var(--border); }
+  .stat-item:last-child { border-right: none; }
+  .stat-num {
+    font-family: 'Syne', sans-serif; font-size: 36px; font-weight: 800; letter-spacing: -1px;
+    background: linear-gradient(135deg, var(--blue), var(--cyan));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; display: block;
+  }
+  .stat-label { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  /* Platforms */
+  .section-tag { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--cyan); margin-bottom: 14px; }
+  .section-title { font-family: 'Syne', sans-serif; font-size: 36px; font-weight: 800; letter-spacing: -1px; margin-bottom: 48px; }
+
+  .platforms-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+  .platform-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 28px 20px; text-align: center; cursor: pointer; transition: all 0.25s;
+  }
+  .platform-card:hover { border-color: rgba(96,165,250,0.3); transform: translateY(-3px); background: var(--surface2); }
+  .platform-logo { font-size: 36px; margin-bottom: 12px; display: block; }
+  .platform-name { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .platform-types { font-size: 12px; color: var(--muted); }
+  .platform-tag {
+    display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.8px;
+    text-transform: uppercase; padding: 2px 8px; border-radius: 4px; margin-top: 10px;
+  }
+
+  /* Features */
+  .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+  .feat-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 28px; transition: border-color 0.2s, transform 0.2s;
+  }
+  .feat-card:hover { border-color: rgba(96,165,250,0.25); transform: translateY(-2px); }
+  .feat-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 16px; }
+  .feat-card h3 { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+  .feat-card p { font-size: 14px; color: var(--muted2); line-height: 1.6; }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 20px; font-size: 14px; font-weight: 500;
+    display: flex; align-items: center; gap: 10px; z-index: 999;
+    transform: translateX(200px); opacity: 0;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .toast.show { transform: translateX(0); opacity: 1; }
+
+  footer {
+    border-top: 1px solid var(--border); padding: 40px 0;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 14px; color: var(--muted);
+  }
+  footer a { color: var(--muted2); text-decoration: none; }
+  footer a:hover { color: var(--blue); }
+
+  @media (max-width: 640px) {
+    .url-row { flex-direction: column; }
+    .result-inner { flex-direction: column; }
+    .thumb-wrap { width: 100%; height: 160px; }
+    .stats-row { flex-direction: column; }
+    .stat-item { border-right: none; border-bottom: 1px solid var(--border); }
+    .stat-item:last-child { border-bottom: none; }
+    nav ul { display: none; }
+    footer { flex-direction: column; gap: 16px; text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="canvas-bg"></canvas>
+<div class="grid-overlay"></div>
+
+<div class="container">
+
+  <nav>
+    <a href="#" class="logo">
+      <div class="logo-icon">⬇</div>
+      Snap<span>Load</span>
+    </a>
+    <ul>
+      <li><a href="#platforms">Platforms</a></li>
+      <li><a href="#features">Features</a></li>
+      <li><a href="/api/health" target="_blank">API Status</a></li>
+    </ul>
+    <div class="status-dot" id="status-dot">
+      <span class="dot"></span>
+      <span id="status-text">Checking...</span>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <div class="badge">✦ Free · No signup · Unlimited</div>
+    <h1>
+      <span class="line1">Download anything</span>
+      <span class="line2">from anywhere.</span>
+    </h1>
+    <p>Paste any link from YouTube, Instagram, Facebook, TikTok or 1000+ sites and grab videos, music, or photos instantly.</p>
+
+    <div class="platform-pills">
+      <div class="pill"><span class="pill-dot" style="background:#f87171"></span> YouTube</div>
+      <div class="pill"><span class="pill-dot" style="background:#f472b6"></span> Instagram</div>
+      <div class="pill"><span class="pill-dot" style="background:#60a5fa"></span> Facebook</div>
+      <div class="pill"><span class="pill-dot" style="background:#34d399"></span> TikTok</div>
+      <div class="pill"><span class="pill-dot" style="background:#a78bfa"></span> Twitter/X</div>
+      <div class="pill"><span class="pill-dot" style="background:#22d3ee"></span> Vimeo</div>
+    </div>
+
+    <!-- Input -->
+    <div class="input-card">
+      <div class="url-row">
+        <div class="url-input-wrap">
+          <span class="icon">🔗</span>
+          <input id="url-input" type="url" placeholder="Paste your YouTube / Instagram / Facebook link here..." autocomplete="off" spellcheck="false">
+        </div>
+        <button class="btn-fetch" id="fetch-btn">
+          <div class="spinner" id="spinner"></div>
+          <span id="btn-text">Fetch Media</span>
+        </button>
+      </div>
+      <div class="format-row">
+        <span class="format-label">Filter</span>
+        <div class="format-tabs">
+          <button class="fmt-btn active" data-fmt="all">All</button>
+          <button class="fmt-btn" data-fmt="video">🎬 Video</button>
+          <button class="fmt-btn" data-fmt="audio">🎵 Audio</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div class="error-banner" id="error-banner">
+      <span>⚠️</span>
+      <span id="error-msg">Something went wrong.</span>
+    </div>
+
+    <!-- Result -->
+    <div class="result-card" id="result-card">
+      <div class="result-inner">
+        <div class="thumb-wrap">
+          <img id="result-thumb" src="" alt="Thumbnail" onerror="this.style.display='none'">
+          <span class="thumb-badge" id="result-dur"></span>
+        </div>
+        <div class="result-info">
+          <div class="result-platform" id="result-platform"></div>
+          <div class="result-title" id="result-title"></div>
+          <div class="result-meta">
+            <span id="result-uploader"></span>
+            <span id="result-views"></span>
+            <span id="result-date"></span>
+          </div>
+          <div class="formats-label">Choose format</div>
+          <div class="format-grid" id="format-grid"></div>
+          <button class="btn-download" id="btn-download" disabled>⬇ Download</button>
+          <div class="progress-wrap" id="progress-wrap">
+            <div class="progress-top">
+              <span id="progress-label">Preparing download...</span>
+              <span id="progress-pct"></span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="progress-fill"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-item"><span class="stat-num">1000+</span><div class="stat-label">Supported sites</div></div>
+    <div class="stat-item"><span class="stat-num">4K</span><div class="stat-label">Max video quality</div></div>
+    <div class="stat-item"><span class="stat-num">320k</span><div class="stat-label">Max audio bitrate</div></div>
+    <div class="stat-item"><span class="stat-num">0</span><div class="stat-label">Ads or signups</div></div>
+  </div>
+
+  <!-- Platforms -->
+  <div id="platforms" style="padding: 40px 0 80px;">
+    <div class="section-tag">Supported Platforms</div>
+    <div class="section-title">Works everywhere.</div>
+    <div class="platforms-grid">
+      <div class="platform-card" onclick="setUrl('https://youtube.com/watch?v=')">
+        <span class="platform-logo">▶️</span>
+        <div class="platform-name">YouTube</div>
+        <div class="platform-types">Videos · Shorts · Playlists · Music</div>
+        <div class="platform-tag" style="background:rgba(248,113,113,0.12);color:#f87171;">4K · HDR</div>
+      </div>
+      <div class="platform-card" onclick="setUrl('https://instagram.com/p/')">
+        <span class="platform-logo">📸</span>
+        <div class="platform-name">Instagram</div>
+        <div class="platform-types">Reels · Posts · Stories · Photos</div>
+        <div class="platform-tag" style="background:rgba(244,114,182,0.12);color:#f472b6;">HD Ready</div>
+      </div>
+      <div class="platform-card" onclick="setUrl('https://facebook.com/watch?v=')">
+        <span class="platform-logo">📘</span>
+        <div class="platform-name">Facebook</div>
+        <div class="platform-types">Videos · Reels · Stories · Live</div>
+        <div class="platform-tag" style="background:rgba(96,165,250,0.12);color:#60a5fa;">HD · SD</div>
+      </div>
+      <div class="platform-card" onclick="setUrl('https://tiktok.com/@')">
+        <span class="platform-logo">🎵</span>
+        <div class="platform-name">TikTok</div>
+        <div class="platform-types">Videos · No watermark</div>
+        <div class="platform-tag" style="background:rgba(52,211,153,0.12);color:#34d399;">No Mark</div>
+      </div>
+      <div class="platform-card" onclick="setUrl('https://x.com/')">
+        <span class="platform-logo">🐦</span>
+        <div class="platform-name">Twitter / X</div>
+        <div class="platform-types">Videos · GIFs · Photos</div>
+        <div class="platform-tag" style="background:rgba(167,139,250,0.12);color:#a78bfa;">Fast</div>
+      </div>
+      <div class="platform-card" onclick="setUrl('https://vimeo.com/')">
+        <span class="platform-logo">🎬</span>
+        <div class="platform-name">Vimeo</div>
+        <div class="platform-types">Videos · Private links</div>
+        <div class="platform-tag" style="background:rgba(34,211,238,0.12);color:#22d3ee;">4K</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Features -->
+  <div id="features" style="padding: 40px 0 80px;">
+    <div class="section-tag">Why SnapLoad</div>
+    <div class="section-title">Built for speed<br>and quality.</div>
+    <div class="features-grid">
+      <div class="feat-card">
+        <div class="feat-icon" style="background:rgba(96,165,250,0.12);">⚡</div>
+        <h3>Lightning fast</h3>
+        <p>Powered by yt-dlp — the fastest, most actively maintained media extractor available anywhere.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon" style="background:rgba(52,211,153,0.12);">🛡️</div>
+        <h3>Private & secure</h3>
+        <p>We never store your URLs or files. Downloads go directly from the source to your device.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon" style="background:rgba(244,114,182,0.12);">🎨</div>
+        <h3>Every format</h3>
+        <p>MP4, WebM, MKV, MP3, AAC, FLAC, OGG — all qualities from 360p up to 4K Ultra HD and HDR.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon" style="background:rgba(251,191,36,0.12);">📱</div>
+        <h3>Any device</h3>
+        <p>Works on desktop, tablet, mobile. No app install required, no plugin, no browser extension.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon" style="background:rgba(167,139,250,0.12);">🎵</div>
+        <h3>Audio extraction</h3>
+        <p>Extract crystal-clear audio via ffmpeg. Supports 320kbps MP3 and lossless FLAC output.</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon" style="background:rgba(34,211,238,0.12);">∞</div>
+        <h3>No limits</h3>
+        <p>Completely free, no daily download cap, no account, no annoying countdown timers.</p>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<div class="container">
+  <footer>
+    <div><strong>SnapLoad</strong> &nbsp;·&nbsp; Powered by yt-dlp &nbsp;·&nbsp; For personal use only.</div>
+    <div style="display:flex;gap:24px;">
+      <a href="#">Terms</a>
+      <a href="#">Privacy</a>
+      <a href="/api/health" target="_blank">API Health</a>
+    </div>
+  </footer>
+</div>
+
+<div class="toast" id="toast">
+  <span id="toast-icon">✓</span>
+  <span id="toast-msg">Done!</span>
+</div>
+
+<script>
+// ── Canvas particles ──────────────────────────────────────────────────────────
+const canvas = document.getElementById('canvas-bg');
+const ctx = canvas.getContext('2d');
+let W, H, particles = [];
+
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+
+class Particle {
+  constructor() {
+    this.x = Math.random() * W; this.y = Math.random() * H;
+    this.r = Math.random() * 1.5 + 0.3;
+    this.vx = (Math.random() - 0.5) * 0.15; this.vy = (Math.random() - 0.5) * 0.15;
+    this.alpha = Math.random() * 0.5 + 0.1;
+    this.color = ['#60a5fa','#22d3ee','#a78bfa','#f472b6'][Math.floor(Math.random()*4)];
+  }
+}
+
+function initParticles() { particles = Array.from({length: 100}, () => new Particle()); }
+
+function drawParticles() {
+  ctx.clearRect(0, 0, W, H);
+  particles.forEach(p => {
+    ctx.save(); ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill(); ctx.restore();
+    p.x += p.vx; p.y += p.vy;
+    if (p.x < 0 || p.x > W) p.vx *= -1;
+    if (p.y < 0 || p.y > H) p.vy *= -1;
+  });
+  for (let i = 0; i < particles.length; i++) {
+    for (let j = i+1; j < particles.length; j++) {
+      const dx = particles[i].x - particles[j].x, dy = particles[i].y - particles[j].y;
+      const d = Math.sqrt(dx*dx+dy*dy);
+      if (d < 100) {
+        ctx.save(); ctx.globalAlpha = (1-d/100)*0.07; ctx.strokeStyle = '#60a5fa';
+        ctx.lineWidth = 0.5; ctx.beginPath();
+        ctx.moveTo(particles[i].x, particles[i].y); ctx.lineTo(particles[j].x, particles[j].y);
+        ctx.stroke(); ctx.restore();
+      }
+    }
+  }
+  requestAnimationFrame(drawParticles);
+}
+
+resize(); initParticles(); drawParticles();
+window.addEventListener('resize', resize);
+
+// ── Health check ──────────────────────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch('/api/health');
+    const d = await r.json();
+    const el = document.getElementById('status-dot');
+    const txt = document.getElementById('status-text');
+    if (d.ytdlp && !d.ytdlp.includes('not found')) {
+      el.classList.add('online');
+      txt.textContent = 'Server online';
+    } else {
+      txt.textContent = 'yt-dlp missing';
+    }
+  } catch {
+    document.getElementById('status-text').textContent = 'Server offline';
+  }
+}
+checkHealth();
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let currentInfo = null;
+let selectedFormat = null;
+let activeFormatFilter = 'all';
+
+// ── Format filter tabs ─────────────────────────────────────────────────────────
+document.querySelectorAll('.fmt-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.fmt-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFormatFilter = btn.dataset.fmt;
+    if (currentInfo) renderFormats(currentInfo.formats);
+  });
+});
+
+// ── Fetch media info ───────────────────────────────────────────────────────────
+const fetchBtn = document.getElementById('fetch-btn');
+fetchBtn.addEventListener('click', fetchMedia);
+document.getElementById('url-input').addEventListener('keydown', e => { if (e.key === 'Enter') fetchMedia(); });
+
+async function fetchMedia() {
+  const url = document.getElementById('url-input').value.trim();
+  if (!url) { showToast('⚠️', 'Please paste a URL first'); return; }
+
+  setLoading(true);
+  hideError();
+  document.getElementById('result-card').classList.remove('show');
+  currentInfo = null;
+  selectedFormat = null;
+
+  try {
+    const res = await fetch(`/api/info?url=${encodeURIComponent(url)}`);
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.error || 'Failed to fetch media info.');
+
+    currentInfo = data;
+    showResult(data);
+    showToast('✓', 'Media ready — choose a format!');
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+function setLoading(on) {
+  const spinner = document.getElementById('spinner');
+  const btnText = document.getElementById('btn-text');
+  spinner.classList.toggle('show', on);
+  btnText.textContent = on ? 'Fetching...' : 'Fetch Media';
+  fetchBtn.disabled = on;
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-banner');
+  document.getElementById('error-msg').textContent = msg;
+  el.classList.add('show');
+}
+function hideError() { document.getElementById('error-banner').classList.remove('show'); }
+
+// ── Render result ─────────────────────────────────────────────────────────────
+const platformColors = {
+  youtube:   { color: '#f87171', bg: 'rgba(248,113,113,0.12)' },
+  instagram: { color: '#f472b6', bg: 'rgba(244,114,182,0.12)' },
+  facebook:  { color: '#60a5fa', bg: 'rgba(96,165,250,0.12)' },
+  tiktok:    { color: '#34d399', bg: 'rgba(52,211,153,0.12)' },
+  twitter:   { color: '#a78bfa', bg: 'rgba(167,139,250,0.12)' },
+  vimeo:     { color: '#22d3ee', bg: 'rgba(34,211,238,0.12)' },
+};
+
+function showResult(info) {
+  // Thumbnail
+  if (info.thumbnail) {
+    document.getElementById('result-thumb').src = info.thumbnail;
+  }
+
+  // Duration
+  document.getElementById('result-dur').textContent = info.duration_string || '';
+
+  // Title
+  document.getElementById('result-title').textContent = info.title || 'Untitled';
+
+  // Platform badge
+  const platKey = (info.platform || '').toLowerCase();
+  const platStyle = platformColors[platKey] || { color: '#60a5fa', bg: 'rgba(96,165,250,0.12)' };
+  const platEl = document.getElementById('result-platform');
+  platEl.textContent = '● ' + (info.platform || 'Media');
+  platEl.style.color = platStyle.color;
+  platEl.style.background = platStyle.bg;
+
+  // Meta
+  document.getElementById('result-uploader').textContent = info.uploader ? '👤 ' + info.uploader : '';
+  document.getElementById('result-views').textContent = info.view_count ? '👁 ' + formatNum(info.view_count) : '';
+  document.getElementById('result-date').textContent = info.upload_date ? '📅 ' + formatDate(info.upload_date) : '';
+
+  renderFormats(info.formats);
+
+  document.getElementById('result-card').classList.add('show');
+  document.getElementById('result-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function renderFormats(formats) {
+  const grid = document.getElementById('format-grid');
+  grid.innerHTML = '';
+  selectedFormat = null;
+  document.getElementById('btn-download').disabled = true;
+
+  const filtered = formats.filter(f => {
+    if (activeFormatFilter === 'video') return !f.isAudio;
+    if (activeFormatFilter === 'audio') return f.isAudio;
+    return true;
+  });
+
+  if (!filtered.length) {
+    grid.innerHTML = '<div style="color:var(--muted);font-size:14px;">No formats found for this filter.</div>';
+    return;
+  }
+
+  filtered.forEach(f => {
+    const div = document.createElement('div');
+    div.className = 'fmt-option';
+    div.dataset.formatId = f.format_id;
+    div.dataset.ext = f.ext;
+    div.dataset.label = f.label;
+
+    const icon = f.isAudio ? '🎵' : (f.height >= 1080 ? '🎬' : '📹');
+    const sizeStr = f.filesize ? formatBytes(f.filesize) : '';
+
+    div.innerHTML = `
+      <span class="fmt-option-icon">${icon}</span>
+      <div>
+        <div class="fmt-option-label">${f.label}</div>
+        ${sizeStr ? `<div class="fmt-option-size">~${sizeStr}</div>` : ''}
+      </div>
+    `;
+
+    div.addEventListener('click', () => {
+      document.querySelectorAll('.fmt-option').forEach(x => x.classList.remove('selected'));
+      div.classList.add('selected');
+      selectedFormat = f;
+      document.getElementById('btn-download').disabled = false;
+    });
+
+    grid.appendChild(div);
+  });
+}
+
+// ── Download ──────────────────────────────────────────────────────────────────
+document.getElementById('btn-download').addEventListener('click', startDownload);
+
+function startDownload() {
+  if (!currentInfo || !selectedFormat) return;
+
+  const url = currentInfo.webpage_url || document.getElementById('url-input').value.trim();
+  const { format_id, ext, label } = selectedFormat;
+  const filename = (currentInfo.title || 'download').substring(0, 80);
+
+  const downloadUrl = `/api/download?url=${encodeURIComponent(url)}&format_id=${encodeURIComponent(format_id)}&ext=${encodeURIComponent(ext)}&filename=${encodeURIComponent(filename)}`;
+
+  // Show fake-but-real progress (real progress requires event streams; this is UX feedback)
+  const progressWrap = document.getElementById('progress-wrap');
+  const fill = document.getElementById('progress-fill');
+  const pctEl = document.getElementById('progress-pct');
+  const labelEl = document.getElementById('progress-label');
+
+  progressWrap.classList.add('show');
+  labelEl.textContent = `Preparing ${label}...`;
+  fill.style.width = '0%'; pctEl.textContent = '0%';
+
+  let progress = 0;
+  const iv = setInterval(() => {
+    progress += Math.random() * 8 + 2;
+    if (progress >= 90) { clearInterval(iv); progress = 90; }
+    fill.style.width = progress + '%';
+    pctEl.textContent = Math.round(progress) + '%';
+    if (progress > 20) labelEl.textContent = `Downloading ${label}...`;
+  }, 300);
+
+  // Trigger browser download
+  const a = document.createElement('a');
+  a.href = downloadUrl;
+  a.download = `${filename}.${ext}`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  // Complete progress after a moment
+  setTimeout(() => {
+    clearInterval(iv);
+    fill.style.width = '100%'; pctEl.textContent = '100%';
+    labelEl.textContent = 'Download started in your browser!';
+    showToast('⬇', 'Download started!');
+    setTimeout(() => progressWrap.classList.remove('show'), 4000);
+  }, 3000);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function formatNum(n) {
+  if (n >= 1e9) return (n/1e9).toFixed(1) + 'B';
+  if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n/1e3).toFixed(1) + 'K';
+  return n.toString();
+}
+
+function formatDate(d) {
+  if (!d || d.length < 8) return d || '';
+  return `${d.substring(0,4)}-${d.substring(4,6)}-${d.substring(6,8)}`;
+}
+
+function formatBytes(b) {
+  if (b >= 1e9) return (b/1e9).toFixed(1) + ' GB';
+  if (b >= 1e6) return (b/1e6).toFixed(1) + ' MB';
+  return (b/1e3).toFixed(0) + ' KB';
+}
+
+function setUrl(prefix) {
+  document.getElementById('url-input').value = prefix;
+  document.getElementById('url-input').focus();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showToast(icon, msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-icon').textContent = icon;
+  document.getElementById('toast-msg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+</script>
+</body>
+</html>
